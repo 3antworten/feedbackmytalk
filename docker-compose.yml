@@ -16,8 +16,8 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
     volumes:
-      - feedback_data:/app/data
-      - feedback_uploads:/app/uploads
+      - ../data:/app/data
+      - ../uploads:/app/uploads    
     expose:
       - "3001"
     restart: unless-stopped
