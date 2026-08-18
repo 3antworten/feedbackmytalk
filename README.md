@@ -92,6 +92,39 @@ participant.
 The SQLite database lives at `server/data/app.db`; rendered slide images at
 `server/uploads/<deckId>/`. Both are gitignored — delete them anytime to reset to a clean state.
 
+## Docker / Docker Compose
+
+The repository includes production-oriented Docker setup for both services:
+
+- `server/Dockerfile` runs the API (`npm start`) on port `3001`.
+- `client/Dockerfile` builds the React app and serves it with nginx.
+- `client/nginx/default.conf` proxies `/api` and `/uploads` to the API container.
+- `docker-compose.yml` wires everything together and persists SQLite data/uploads in Docker
+  volumes.
+
+Quick start:
+
+```bash
+cp .env.docker.example .env
+docker compose up --build -d
+```
+
+Open `http://localhost:8080`.
+
+Useful commands:
+
+```bash
+docker compose logs -f
+docker compose down
+docker compose down -v   # also removes database + uploaded slide images
+```
+
+Notes:
+
+- Set a strong `JWT_SECRET` in `.env` before exposing the app publicly.
+- `APP_DOMAIN` should match your public URL in real deployments (used in confirmation emails).
+- For mail/confirmation flow, set `SMTP_*` values in `.env`.
+
 ## Configuration
 
 All configuration is via environment variables read in `server/src/config.js` — copy
