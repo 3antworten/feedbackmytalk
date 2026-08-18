@@ -4,12 +4,14 @@ import { db } from "./db/index.js";
 import { formatSpeaker } from "./format.js";
 
 const COOKIE_NAME = "fmt_token";
+const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
 
 export function issueSpeakerCookie(res, speakerId) {
   const token = jwt.sign({ sub: speakerId }, JWT_SECRET, { expiresIn: "30d" });
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: COOKIE_SECURE,
     maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 }
