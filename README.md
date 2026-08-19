@@ -20,11 +20,20 @@
 
 Speakers upload a PDF deck, create a rehearsal or live session, and share a join link or QR
 code. Participants — no account required — browse the slides on their own device and leave
-comments and questions on any slide as they go. Speakers review everything afterward through a
-**Feedback by Slide** view and a searchable **Question Bank**.
+comments and questions on any slide as they go. Both speakers and participants review
+everything afterward through **Comments** and **Questions** tabs, a top-voted flat
+list, or the same items grouped by slide with a persistent thumbnail.
 
 ### Highlights
 
+- **Upvote/downvote everything** — every comment and question can be voted 👍/👎 by anyone in
+  the session. Lists are sorted by score first, then the viewer's own feedback, then oldest first.
+- **Two ways to browse feedback** — switch between the top-voted flat list and a per-slide grouped view with a
+  thumbnail of the slide.
+- **Shared "asked live", private notes** — any participant can mark a question as asked live;
+  once marked, every participant gets to leave a note on how the answer landed
+  (auto-saved as they type, only visible to the speaker).
+  The speaker sees a read-only ASKED/NOT ASKED badge and the list of notes people left, only when there are any.
 - **Practice Q&A** — speakers can maintain a list of anticipated questions per session.
   Participants get a dedicated tab to rehearse against them: marking which ones they'd ask, and
   privately noting how well an answer landed.
@@ -33,10 +42,6 @@ comments and questions on any slide as they go. Speakers review everything after
   when a page has no extractable text.
 - **A trailing "general" slide** — every deck gets one synthetic slide after the last page, for
   wrap-up comments and questions that aren't tied to any particular slide.
-- **Your own items, front and center** — a participant's own comments and questions are sorted
-  to the top of each slide with a visual highlight, separate from everyone else's.
-- **Thumbnails everywhere it helps** — hoverable on the speaker's Question Bank, and shown
-  inline on the participant's personal recap of everything they've posted.
 - **A real landing page** — logged-out visitors choose "I'm a participant" (straight to the join
   screen) or "I'm a speaker" (log in / register). Already-logged-in speakers skip straight to
   their dashboard.
@@ -172,9 +177,17 @@ A few implementation choices worth knowing about if you're extending or self-hos
 - **Shared visibility** — all participants in a session see all comments and questions on a
   slide from everyone else in that session; only the author (or the speaker, for moderation) can
   delete an item.
+- **Voting** — one vote per person per item (`participant:<id>` or `speaker:<id>` as the voter
+  key), stored as a single up/down row that's upserted on change and deleted when toggled off.
+  Comments and questions each have their own vote table.
+- **Asked-live vs. answer notes** — `asked_live` lives on the question itself (a single shared
+  fact anyone can flip), while the "how did it land" note is per participant (its own table,
+  one row per participant per question) — deliberately different from the shared boolean, since
+  it's everyone's own opinion rather than a fact about the session.
 - **PDF rendering** — done server-side via `mupdf`'s WASM build rather than a native-binding
   library, so there's no system-level dependency (Cairo, Ghostscript, poppler-utils, etc.) to
-  install. Slides render at roughly 144 DPI as PNG.
+  install. Slides render at roughly 144 DPI as JPEG (80% quality) to keep storage and transfer
+  size moderate.
 - **QR codes** — generated client-side from the join URL; no server-side QR generation involved.
 - **Join codes** — short, human-typeable 6-character codes are auto-suggested (e.g. `L6CRVN`)
   rather than raw UUIDs, and can be renamed to something custom afterward.
