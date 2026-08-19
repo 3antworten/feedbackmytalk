@@ -43,8 +43,8 @@ export default function CommentItem({
           </button>
         )}
       </div>
-      <div>{comment.text}</div>
-      <div className="row" style={{ marginTop: "0.35rem" }}>
+      <div className="feedback-content">{comment.text}</div>
+      <div className="feedback-footer row between">
         <VoteWidget
           votes={comment.votes}
           onVote={(value) => onVote(comment.id, value)}

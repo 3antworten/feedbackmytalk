@@ -258,6 +258,22 @@ select:focus {
   border-color: #c3cdf7;
   background: #eef1fd;
 }
+.feedback-content {
+  margin: 0.3rem 0;
+}
+.feedback-footer {
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.feedback-note {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-left: 3px solid var(--border);
+  background: #f3f4f7;
+  border-radius: 0 6px 6px 0;
+}
 .item-entry-with-thumb {
   display: flex;
   gap: 0.75rem;

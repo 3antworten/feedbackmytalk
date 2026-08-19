@@ -14,10 +14,11 @@ function slideOf(item) {
   };
 }
 
-// Renders one question row. Asked-live is a shared fact anyone can toggle; once set, every
-// participant gets their own note on how it landed (auto-saved) — not just the author or
-// whoever ticked the box. The speaker never gets these controls: just a read-only badge and
-// the list of notes participants left.
+// Renders one question row using the same header/content/footer template as comments.
+// The footer additionally carries the "asked live" control (checkbox for participants,
+// read-only badge for the speaker), left of the vote widget. Once asked live, a reply-like
+// note section appears below the footer — every participant gets their own editable note;
+// the speaker only ever sees a read-only list, and only when someone actually left one.
 export default function QuestionItem({
   question,
   showSlideRef,
@@ -61,71 +62,57 @@ export default function QuestionItem({
           {" · "}
           {new Date(question.created_at).toLocaleString()}
         </span>
-        {!canModerate && canDelete && (
+        {canDelete && (
           <button className="ghost small" onClick={() => onDelete(question.id)} title="Delete">
             ✕
           </button>
         )}
       </div>
-      <div style={{ marginBottom: "0.4rem" }}>{question.text}</div>
-
-      {canModerate ? (
-        <div className="row between" style={{ marginBottom: "0.4rem" }}>
+      <div className="feedback-content">{question.text}</div>
+      <div className="feedback-footer row between">
+        <VoteWidget
+          votes={question.votes}
+          onVote={(value) => onVote(question.id, value)}
+          interactive={!canModerate}
+          hideEmpty={canModerate}
+        />
+        {canModerate ? (
           <span className={`badge ${question.askedLive ? "open" : "closed"}`}>
             {question.askedLive ? "Asked live" : "Not asked live"}
           </span>
-          {canDelete && (
-            <button className="ghost small" onClick={() => onDelete(question.id)} title="Delete">
-              ✕
-            </button>
-          )}
-        </div>
-      ) : (
-        <label className="checkbox-row small" style={{ marginBottom: "0.4rem" }}>
-          <input
-            type="checkbox"
-            checked={question.askedLive}
-            onChange={(e) => onToggleAskedLive(question.id, e.target.checked)}
-          />
-          Asked live
-        </label>
-      )}
+        ) : (
+          <label className="checkbox-row small">
+            <input
+              type="checkbox"
+              checked={question.askedLive}
+              onChange={(e) => onToggleAskedLive(question.id, e.target.checked)}
+            />
+            Asked live
+          </label>
+        )}
+      </div>
 
-      {question.askedLive && canModerate && (
-        <div className="stack small" style={{ marginBottom: "0.4rem" }}>
-          {question.responses?.length ? (
-            question.responses.map((r, i) => (
-              <div key={i} className="muted">
-                <strong>{r.author}: </strong>
-                {r.answerNote}
-              </div>
-            ))
-          ) : (
-            <p className="muted small" style={{ margin: 0 }}>
-              No participant has left a note yet.
-            </p>
-          )}
+      {question.askedLive && canModerate && question.responses?.length > 0 && (
+        <div className="feedback-note stack small">
+          {question.responses.map((r, i) => (
+            <div key={i}>
+              <strong>{r.author}: </strong>
+              {r.answerNote}
+            </div>
+          ))}
         </div>
       )}
 
       {question.askedLive && !canModerate && (
-        <label className="small" style={{ display: "block", marginBottom: "0.4rem" }}>
-          Your note on how it was answered
+        <label className="feedback-note small">
           <textarea
             rows={2}
             value={answerNote}
             onChange={handleNoteChange}
-            placeholder="e.g. answered well, expected more depth…"
+            placeholder="Feedback the answer: well explained or expected more?"
           />
         </label>
       )}
-
-      <VoteWidget
-        votes={question.votes}
-        onVote={(value) => onVote(question.id, value)}
-        interactive={!canModerate}
-        hideEmpty={canModerate}
-      />
     </div>
   );
 }
