@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Feedback My Talk" width="360">
+  <img src="assets/logo/combinedmark_full.png" alt="Feedback My Talk" width="360">
 </p>
 
 <h3 align="center">Feedback My Talk</h3>
