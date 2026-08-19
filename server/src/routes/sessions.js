@@ -3,6 +3,8 @@ import { nanoid } from "nanoid";
 import { db } from "../db/index.js";
 import { requireSpeaker } from "../auth.js";
 import { formatSlide, formatSession, displayAuthor } from "../format.js";
+import { voterKeyFor, voteSummaries } from "../votes.js";
+import { responsesByQuestionId, withQuestionResponses } from "../questionResponses.js";
 
 const router = Router();
 
@@ -11,6 +13,24 @@ function requireParticipantOfSession(req, res, next) {
   if (!req.participant || req.participant.session_id !== req.params.sessionId) {
     return res.status(401).json({ error: "Not joined to this session" });
   }
+  next();
+}
+
+// Shared feedback views (comments/questions across the whole session) are visible to any
+// participant joined to the session, or the speaker who owns it — attaches `req.sessionRow`
+// and `req.canModerate` (true only for the owning speaker, who may delete others' items).
+function requireSessionAccess(req, res, next) {
+  const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  const isParticipant = req.participant && req.participant.session_id === session.id;
+  const isOwningSpeaker =
+    req.speaker &&
+    db.prepare("SELECT 1 FROM decks WHERE id = ? AND speaker_id = ?").get(session.deck_id, req.speaker.id);
+  if (!isParticipant && !isOwningSpeaker) {
+    return res.status(401).json({ error: "Not authorized for this session" });
+  }
+  req.sessionRow = session;
+  req.canModerate = !!isOwningSpeaker;
   next();
 }
 
@@ -117,43 +137,56 @@ router.delete("/:sessionId", requireSpeaker, (req, res) => {
   res.status(204).end();
 });
 
-// Speaker review: Feedback by Slide — every slide with its comments underneath.
-router.get("/:sessionId/review/slides", requireSpeaker, (req, res) => {
-  const session = loadOwnedSession(req.params.sessionId, req.speaker.id);
-  if (!session) return res.status(404).json({ error: "Session not found" });
+// Shared feedback view: every comment in the session, flat, with slide + author + vote info.
+// Used by both the speaker's review page and the participant's Comments tab — the client
+// decides how to sort/group it (flat list vs. grouped by slide).
+router.get("/:sessionId/comments", requireSessionAccess, (req, res) => {
+  const session = req.sessionRow;
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.text, c.created_at, c.participant_id,
+              s.id AS slideId, s.order_index AS slideOrderIndex, s.title AS slideTitle,
+              s.image_path AS slideImagePath, s.is_general AS slideIsGeneral,
+              p.display_name, p.join_order
+       FROM comments c
+       JOIN slides s ON s.id = c.slide_id
+       JOIN participants p ON p.id = c.participant_id
+       WHERE c.session_id = ?
+       ORDER BY c.created_at ASC`
+    )
+    .all(session.id);
 
-  const slides = db
-    .prepare("SELECT * FROM slides WHERE deck_id = ? ORDER BY order_index")
-    .all(session.deck_id);
-
-  const commentStmt = db.prepare(
-    `SELECT c.id, c.text, c.created_at, p.display_name, p.join_order
-     FROM comments c JOIN participants p ON p.id = c.participant_id
-     WHERE c.slide_id = ? ORDER BY c.created_at ASC`
+  const votesById = voteSummaries(
+    "comment_votes",
+    "comment_id",
+    rows.map((r) => r.id),
+    voterKeyFor(req)
   );
 
-  const slidesWithComments = slides.map((slide) => ({
-    ...formatSlide(slide),
-    comments: commentStmt.all(slide.id).map((row) => ({
-      id: row.id,
-      text: row.text,
-      created_at: row.created_at,
-      author: displayAuthor(row.display_name, row.join_order),
-    })),
+  const comments = rows.map((row) => ({
+    id: row.id,
+    text: row.text,
+    created_at: row.created_at,
+    authorParticipantId: row.participant_id,
+    author: displayAuthor(row.display_name, row.join_order),
+    slideId: row.slideId,
+    slideOrderIndex: row.slideOrderIndex,
+    slideTitle: row.slideTitle || null,
+    slideImagePath: row.slideImagePath,
+    slideIsGeneral: !!row.slideIsGeneral,
+    votes: votesById.get(row.id),
   }));
 
-  res.json({ session: formatSession(session), slides: slidesWithComments });
+  res.json({ session: formatSession(session), comments, canModerate: req.canModerate });
 });
 
-// Speaker review: Question Bank — every question across all slides.
-router.get("/:sessionId/review/questions", requireSpeaker, (req, res) => {
-  const session = loadOwnedSession(req.params.sessionId, req.speaker.id);
-  if (!session) return res.status(404).json({ error: "Session not found" });
-
-  const questions = db
+// Shared feedback view: every question in the session, flat, with slide + author + vote info.
+router.get("/:sessionId/questions", requireSessionAccess, (req, res) => {
+  const session = req.sessionRow;
+  const rows = db
     .prepare(
-      `SELECT q.id, q.text, q.asked_live, q.answer_note, q.created_at,
-              q.slide_id AS slideId, s.order_index AS slideOrderIndex, s.title AS slideTitle,
+      `SELECT q.id, q.text, q.asked_live, q.created_at, q.participant_id,
+              s.id AS slideId, s.order_index AS slideOrderIndex, s.title AS slideTitle,
               s.image_path AS slideImagePath, s.is_general AS slideIsGeneral,
               p.display_name, p.join_order
        FROM questions q
@@ -164,21 +197,36 @@ router.get("/:sessionId/review/questions", requireSpeaker, (req, res) => {
     )
     .all(session.id);
 
-  const formatted = questions.map((row) => ({
-    id: row.id,
-    text: row.text,
-    created_at: row.created_at,
-    slideId: row.slideId,
-    slideOrderIndex: row.slideOrderIndex,
-    slideTitle: row.slideTitle || null,
-    slideImagePath: row.slideImagePath,
-    slideIsGeneral: !!row.slideIsGeneral,
-    askedLive: !!row.asked_live,
-    answerNote: row.answer_note || "",
-    author: displayAuthor(row.display_name, row.join_order),
-  }));
+  const votesById = voteSummaries(
+    "question_votes",
+    "question_id",
+    rows.map((r) => r.id),
+    voterKeyFor(req)
+  );
+  const responsesById = responsesByQuestionId(rows.map((r) => r.id));
 
-  res.json({ session: formatSession(session), questions: formatted });
+  const questions = rows.map((row) =>
+    withQuestionResponses(
+      {
+        id: row.id,
+        text: row.text,
+        created_at: row.created_at,
+        authorParticipantId: row.participant_id,
+        author: displayAuthor(row.display_name, row.join_order),
+        askedLive: !!row.asked_live,
+        slideId: row.slideId,
+        slideOrderIndex: row.slideOrderIndex,
+        slideTitle: row.slideTitle || null,
+        slideImagePath: row.slideImagePath,
+        slideIsGeneral: !!row.slideIsGeneral,
+        votes: votesById.get(row.id),
+      },
+      responsesById,
+      req.participant?.id
+    )
+  );
+
+  res.json({ session: formatSession(session), questions, canModerate: req.canModerate });
 });
 
 // Speaker review: Practice Q&A — each prepared question with every participant's response.
@@ -223,51 +271,6 @@ router.get("/:sessionId/slides", requireParticipantOfSession, (req, res) => {
     .all(session.deck_id)
     .map(formatSlide);
   res.json({ session: formatSession(session), slides });
-});
-
-// Participant: "My items" recap — own comments and questions, as two separate flat lists
-// (never merged), each entry carrying enough slide info to show a thumbnail + label.
-router.get("/:sessionId/my-items", requireParticipantOfSession, (req, res) => {
-  const rows = db
-    .prepare(
-      `SELECT s.id AS slideId, s.order_index AS slideOrderIndex, s.title AS slideTitle,
-              s.image_path AS slideImagePath, s.is_general AS slideIsGeneral
-       FROM slides s
-       JOIN sessions se ON se.deck_id = s.deck_id
-       WHERE se.id = ? ORDER BY s.order_index`
-    )
-    .all(req.params.sessionId);
-  const slideById = new Map(rows.map((r) => [r.slideId, r]));
-
-  function withSlide(row) {
-    const s = slideById.get(row.slide_id);
-    return {
-      id: row.id,
-      text: row.text,
-      created_at: row.created_at,
-      slideId: row.slide_id,
-      slideOrderIndex: s?.slideOrderIndex ?? null,
-      slideTitle: s?.slideTitle || null,
-      slideImagePath: s?.slideImagePath ?? null,
-      slideIsGeneral: !!s?.slideIsGeneral,
-    };
-  }
-
-  const comments = db
-    .prepare("SELECT * FROM comments WHERE session_id = ? AND participant_id = ? ORDER BY created_at ASC")
-    .all(req.params.sessionId, req.participant.id)
-    .map(withSlide);
-
-  const questions = db
-    .prepare("SELECT * FROM questions WHERE session_id = ? AND participant_id = ? ORDER BY created_at ASC")
-    .all(req.params.sessionId, req.participant.id)
-    .map((row) => ({
-      ...withSlide(row),
-      askedLive: !!row.asked_live,
-      answerNote: row.answer_note || "",
-    }));
-
-  res.json({ comments, questions });
 });
 
 export default router;

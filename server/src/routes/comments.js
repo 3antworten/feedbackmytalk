@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
 import { db } from "../db/index.js";
+import { voterKeyFor, voteSummary, voteSummaries, castVote } from "../votes.js";
 // req.speaker and req.participant are already populated by the global
 // attachSpeaker/attachParticipant middleware in index.js.
 
@@ -33,7 +34,17 @@ commentsBySlideRouter.get("/", (req, res) => {
        WHERE c.slide_id = ? ORDER BY c.created_at ASC`
     )
     .all(slide.id);
-  res.json({ session: { id: session.id, status: session.status }, comments: comments.map(formatAuthored) });
+  const voterKey = voterKeyFor(req);
+  const votesById = voteSummaries(
+    "comment_votes",
+    "comment_id",
+    comments.map((c) => c.id),
+    voterKey
+  );
+  res.json({
+    session: { id: session.id, status: session.status },
+    comments: comments.map((row) => ({ ...formatAuthored(row), votes: votesById.get(row.id) })),
+  });
 });
 
 commentsBySlideRouter.post("/", (req, res) => {
@@ -58,7 +69,7 @@ commentsBySlideRouter.post("/", (req, res) => {
        FROM comments c JOIN participants p ON p.id = c.participant_id WHERE c.id = ?`
     )
     .get(id);
-  res.status(201).json({ comment: formatAuthored(row) });
+  res.status(201).json({ comment: { ...formatAuthored(row), votes: voteSummary("comment_votes", "comment_id", id, voterKeyFor(req)) } });
 });
 
 // Mounted at /api/comments/:id — deletion by author (while open) or owning speaker (moderation, any time).
@@ -86,6 +97,28 @@ commentByIdRouter.delete("/:id", (req, res) => {
     return res.status(204).end();
   }
   res.status(403).json({ error: "Not authorized to delete this comment" });
+});
+
+// Vote: any participant of the session, or the owning speaker, may cast/change/remove a vote.
+commentByIdRouter.put("/:id/vote", (req, res) => {
+  const comment = db.prepare("SELECT * FROM comments WHERE id = ?").get(req.params.id);
+  if (!comment) return res.status(404).json({ error: "Comment not found" });
+  const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(comment.session_id);
+
+  const isParticipantOfSession = req.participant && req.participant.session_id === session.id;
+  const isOwningSpeaker =
+    req.speaker &&
+    db.prepare("SELECT 1 FROM decks WHERE id = ? AND speaker_id = ?").get(session.deck_id, req.speaker.id);
+  if (!isParticipantOfSession && !isOwningSpeaker) {
+    return res.status(403).json({ error: "Not authorized to vote on this comment" });
+  }
+
+  try {
+    castVote("comment_votes", "comment_id", comment.id, voterKeyFor(req), req.body?.value);
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.message });
+  }
+  res.json({ votes: voteSummary("comment_votes", "comment_id", comment.id, voterKeyFor(req)) });
 });
 
 export default { commentsBySlideRouter, commentByIdRouter };

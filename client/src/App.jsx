@@ -19,7 +19,8 @@ import ImprintPage from "./pages/ImprintPage";
 
 import JoinPage from "./pages/JoinPage";
 import SlideViewerPage from "./pages/SlideViewerPage";
-import MyItemsPage from "./pages/MyItemsPage";
+import CommentsPage from "./pages/CommentsPage";
+import QuestionsPage from "./pages/QuestionsPage";
 import PracticeQAPage from "./pages/PracticeQAPage";
 
 export default function App() {
@@ -93,7 +94,8 @@ export default function App() {
         <Route path="/j/:joinCode" element={<JoinPage />} />
         <Route path="/j/:joinCode/view" element={<SlideViewerPage />} />
         <Route path="/j/:joinCode/view/:slideIdx" element={<SlideViewerPage />} />
-        <Route path="/j/:joinCode/my-items" element={<MyItemsPage />} />
+        <Route path="/j/:joinCode/comments" element={<CommentsPage />} />
+        <Route path="/j/:joinCode/questions" element={<QuestionsPage />} />
         <Route path="/j/:joinCode/practice" element={<PracticeQAPage />} />
 
         {/* Legal */}

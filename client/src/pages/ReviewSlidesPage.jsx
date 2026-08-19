@@ -3,21 +3,26 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import Layout from "../components/Layout";
 import ReviewTabs from "../components/ReviewTabs";
-import { slideLabel } from "../format";
+import CommentsBoard from "../components/CommentsBoard";
+import ViewToggle from "../components/ViewToggle";
 
 export default function ReviewSlidesPage() {
   const { deckId, sessionId } = useParams();
-  const [data, setData] = useState(null);
+  const [comments, setComments] = useState(null);
+  const [slides, setSlides] = useState(null);
   const [error, setError] = useState(null);
+  const [view, setView] = useState("list");
 
   function reload() {
-    api
-      .reviewBySlide(sessionId)
-      .then(setData)
+    Promise.all([api.sessionComments(sessionId), api.getDeck(deckId)])
+      .then(([commentsData, deckData]) => {
+        setComments(commentsData.comments);
+        setSlides(deckData.slides);
+      })
       .catch((e) => setError(e.message));
   }
 
-  useEffect(reload, [sessionId]);
+  useEffect(reload, [sessionId, deckId]);
 
   async function removeComment(id) {
     if (!confirm("Delete this comment?")) return;
@@ -34,50 +39,18 @@ export default function ReviewSlidesPage() {
       <p>
         <Link to={`/decks/${deckId}/sessions/${sessionId}`}>← Back to session</Link>
       </p>
-      <h1>Feedback by Slide</h1>
-      <p className="muted small">Every slide in the deck, with all comments left underneath it.</p>
+      <div className="board-header">
+        <h1>Comments</h1>
+        <ViewToggle view={view} onChange={setView} />
+      </div>
+      <p className="muted small">Every comment collected in the session, upvoted by relevance.</p>
       <ReviewTabs deckId={deckId} sessionId={sessionId} />
 
       {error && <p className="error-text">{error}</p>}
-      {!data && !error && <p className="spinner-note">Loading…</p>}
+      {!comments && !error && <p className="spinner-note">Loading…</p>}
 
-      {data && (
-        <div className="stack">
-          {data.slides.map((slide) => (
-            <div className="card" key={slide.id}>
-              <div className="panel-columns">
-                {slide.isGeneral ? (
-                  <div className="slide-image general-slide-placeholder" style={{ minHeight: 160 }}>
-                    <strong>General</strong>
-                    <span className="muted small">Not tied to a specific slide</span>
-                  </div>
-                ) : (
-                  <img className="slide-image" src={slide.imagePath} alt={slideLabel(slide)} />
-                )}
-                <div className="stack">
-                  <strong>
-                    {slideLabel(slide)} · {slide.comments.length} comment
-                    {slide.comments.length === 1 ? "" : "s"}
-                  </strong>
-                  {slide.comments.length === 0 && <p className="muted small">No comments on this slide.</p>}
-                  {slide.comments.map((c) => (
-                    <div className="item-entry" key={c.id}>
-                      <div className="meta row between">
-                        <span>
-                          {c.author} · {new Date(c.created_at).toLocaleString()}
-                        </span>
-                        <button className="ghost small" onClick={() => removeComment(c.id)} title="Delete">
-                          ✕
-                        </button>
-                      </div>
-                      <div>{c.text}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {comments && (
+        <CommentsBoard comments={comments} slides={slides} view={view} canModerate onDelete={removeComment} />
       )}
     </Layout>
   );

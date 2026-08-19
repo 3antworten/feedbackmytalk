@@ -102,12 +102,48 @@ CREATE TABLE IF NOT EXISTS prepared_question_responses (
   UNIQUE (prepared_question_id, participant_id)
 );
 
+-- Per-participant note on how a (slide) question was answered — asked_live itself lives on
+-- the question row (shared: anyone can mark it asked), but the "how did it land" note is
+-- everyone's own opinion, so each participant gets their own row here.
+CREATE TABLE IF NOT EXISTS question_responses (
+  id TEXT PRIMARY KEY,
+  question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  participant_id TEXT NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+  answer_note TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (question_id, participant_id)
+);
+
+-- Up/downvotes on comments and questions. voter_key identifies the voter regardless of
+-- role — "participant:<id>" or "speaker:<id>" — so one person can only vote once per item
+-- (re-voting the same direction is treated as "remove my vote" by the route handler).
+CREATE TABLE IF NOT EXISTS comment_votes (
+  id TEXT PRIMARY KEY,
+  comment_id TEXT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+  voter_key TEXT NOT NULL,
+  value INTEGER NOT NULL CHECK (value IN (1, -1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (comment_id, voter_key)
+);
+
+CREATE TABLE IF NOT EXISTS question_votes (
+  id TEXT PRIMARY KEY,
+  question_id TEXT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  voter_key TEXT NOT NULL,
+  value INTEGER NOT NULL CHECK (value IN (1, -1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (question_id, voter_key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_slides_deck ON slides(deck_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_comments_session_slide ON comments(session_id, slide_id);
 CREATE INDEX IF NOT EXISTS idx_questions_session_slide ON questions(session_id, slide_id);
 CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id);
 CREATE INDEX IF NOT EXISTS idx_prepared_questions_session ON prepared_questions(session_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_prepared_responses_participant ON prepared_question_responses(participant_id);
+CREATE INDEX IF NOT EXISTS idx_comment_votes_comment ON comment_votes(comment_id);
+CREATE INDEX IF NOT EXISTS idx_question_votes_question ON question_votes(question_id);
+CREATE INDEX IF NOT EXISTS idx_question_responses_question ON question_responses(question_id);
 `);
 
 // Lightweight forward-migration for prototype DBs created before a column existed.

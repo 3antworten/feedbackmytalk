@@ -1,16 +1,17 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
 import { db } from "../db/index.js";
+import { voterKeyFor, voteSummary, voteSummaries, castVote } from "../votes.js";
+import { responsesByQuestionId, withQuestionResponses, upsertQuestionResponse } from "../questionResponses.js";
 // req.speaker and req.participant are already populated by the global
 // attachSpeaker/attachParticipant middleware in index.js.
 
 function formatAuthored(row) {
-  const { display_name, join_order, participant_id, asked_live, answer_note, ...rest } = row;
+  const { display_name, join_order, participant_id, asked_live, ...rest } = row;
   return {
     ...rest,
     authorParticipantId: participant_id,
     askedLive: !!asked_live,
-    answerNote: answer_note || "",
     author: display_name && display_name.trim() ? display_name.trim() : `Anonymous #${join_order}`,
   };
 }
@@ -30,12 +31,29 @@ questionsBySlideRouter.get("/", (req, res) => {
   if (!slide) return res.status(404).json({ error: "Slide not found in this session" });
   const questions = db
     .prepare(
-      `SELECT q.id, q.text, q.asked_live, q.answer_note, q.created_at, q.participant_id, p.display_name, p.join_order
+      `SELECT q.id, q.text, q.asked_live, q.created_at, q.participant_id, p.display_name, p.join_order
        FROM questions q JOIN participants p ON p.id = q.participant_id
        WHERE q.slide_id = ? ORDER BY q.created_at ASC`
     )
     .all(slide.id);
-  res.json({ session: { id: session.id, status: session.status }, questions: questions.map(formatAuthored) });
+  const voterKey = voterKeyFor(req);
+  const votesById = voteSummaries(
+    "question_votes",
+    "question_id",
+    questions.map((q) => q.id),
+    voterKey
+  );
+  const responsesById = responsesByQuestionId(questions.map((q) => q.id));
+  res.json({
+    session: { id: session.id, status: session.status },
+    questions: questions.map((row) =>
+      withQuestionResponses(
+        { ...formatAuthored(row), votes: votesById.get(row.id) },
+        responsesById,
+        req.participant?.id
+      )
+    ),
+  });
 });
 
 questionsBySlideRouter.post("/", (req, res) => {
@@ -56,11 +74,18 @@ questionsBySlideRouter.post("/", (req, res) => {
   ).run(id, session.id, slide.id, req.participant.id, text);
   const row = db
     .prepare(
-      `SELECT q.id, q.text, q.asked_live, q.answer_note, q.created_at, q.participant_id, p.display_name, p.join_order
+      `SELECT q.id, q.text, q.asked_live, q.created_at, q.participant_id, p.display_name, p.join_order
        FROM questions q JOIN participants p ON p.id = q.participant_id WHERE q.id = ?`
     )
     .get(id);
-  res.status(201).json({ question: formatAuthored(row) });
+  res.status(201).json({
+    question: {
+      ...formatAuthored(row),
+      votes: voteSummary("question_votes", "question_id", id, voterKeyFor(req)),
+      myAnswerNote: "",
+      responses: [],
+    },
+  });
 });
 
 // Mounted at /api/questions/:id.
@@ -97,31 +122,71 @@ questionByIdRouter.delete("/:id", (req, res) => {
   res.status(403).json({ error: "Not authorized to delete this question" });
 });
 
-// Update askedLive / answerNote — author only, editable regardless of session open/closed status.
+// Update askedLive — any participant of the session may toggle it (it's a shared fact about
+// whether the question got asked live, not any one person's opinion). Editable regardless
+// of session open/closed status.
 questionByIdRouter.patch("/:id", (req, res) => {
-  const { question } = loadWithSession(req.params.id);
+  const { question, session } = loadWithSession(req.params.id);
   if (!question) return res.status(404).json({ error: "Question not found" });
-  if (!req.participant || req.participant.id !== question.participant_id) {
-    return res.status(403).json({ error: "Only the author can edit this question" });
+  if (!req.participant || req.participant.session_id !== session.id) {
+    return res.status(403).json({ error: "Only session participants can update this question" });
   }
 
   const askedLive = req.body?.askedLive;
-  const answerNote = req.body?.answerNote;
-  const nextAskedLive = typeof askedLive === "boolean" ? (askedLive ? 1 : 0) : question.asked_live;
-  const nextAnswerNote = typeof answerNote === "string" ? answerNote.slice(0, 2000) : question.answer_note;
+  if (typeof askedLive !== "boolean") {
+    return res.status(400).json({ error: "askedLive must be a boolean" });
+  }
 
-  db.prepare("UPDATE questions SET asked_live = ?, answer_note = ? WHERE id = ?").run(
-    nextAskedLive,
-    nextAnswerNote,
-    question.id
-  );
+  db.prepare("UPDATE questions SET asked_live = ? WHERE id = ?").run(askedLive ? 1 : 0, question.id);
   const row = db
     .prepare(
-      `SELECT q.id, q.text, q.asked_live, q.answer_note, q.created_at, q.participant_id, p.display_name, p.join_order
+      `SELECT q.id, q.text, q.asked_live, q.created_at, q.participant_id, p.display_name, p.join_order
        FROM questions q JOIN participants p ON p.id = q.participant_id WHERE q.id = ?`
     )
     .get(question.id);
-  res.json({ question: formatAuthored(row) });
+  const responsesById = responsesByQuestionId([question.id]);
+  res.json({
+    question: withQuestionResponses(
+      { ...formatAuthored(row), votes: voteSummary("question_votes", "question_id", question.id, voterKeyFor(req)) },
+      responsesById,
+      req.participant.id
+    ),
+  });
+});
+
+// Update the requesting participant's own note on how the question was answered — everyone
+// gets their own row here, regardless of who asked the question or who marked it asked live.
+questionByIdRouter.patch("/:id/response", (req, res) => {
+  const { question, session } = loadWithSession(req.params.id);
+  if (!question) return res.status(404).json({ error: "Question not found" });
+  if (!req.participant || req.participant.session_id !== session.id) {
+    return res.status(403).json({ error: "Only session participants can leave a note" });
+  }
+
+  const answerNote = typeof req.body?.answerNote === "string" ? req.body.answerNote.slice(0, 2000) : "";
+  upsertQuestionResponse(question.id, req.participant.id, answerNote);
+  res.json({ answerNote });
+});
+
+// Vote: any participant of the session, or the owning speaker, may cast/change/remove a vote.
+questionByIdRouter.put("/:id/vote", (req, res) => {
+  const { question, session } = loadWithSession(req.params.id);
+  if (!question) return res.status(404).json({ error: "Question not found" });
+
+  const isParticipantOfSession = req.participant && req.participant.session_id === session.id;
+  const isOwningSpeaker =
+    req.speaker &&
+    db.prepare("SELECT 1 FROM decks WHERE id = ? AND speaker_id = ?").get(session.deck_id, req.speaker.id);
+  if (!isParticipantOfSession && !isOwningSpeaker) {
+    return res.status(403).json({ error: "Not authorized to vote on this question" });
+  }
+
+  try {
+    castVote("question_votes", "question_id", question.id, voterKeyFor(req), req.body?.value);
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.message });
+  }
+  res.json({ votes: voteSummary("question_votes", "question_id", question.id, voterKeyFor(req)) });
 });
 
 export default { questionsBySlideRouter, questionByIdRouter };

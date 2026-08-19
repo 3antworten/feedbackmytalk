@@ -37,8 +37,11 @@ export default function ParticipantLayout({ joinCode, session, participant, chil
             <Link className={pathname.includes("/view") ? "active" : ""} to={`/j/${joinCode}/view`}>
               Slides
             </Link>
-            <Link className={pathname.includes("/my-items") ? "active" : ""} to={`/j/${joinCode}/my-items`}>
-              My Feedback
+            <Link className={pathname.includes("/questions") ? "active" : ""} to={`/j/${joinCode}/questions`}>
+              Questions
+            </Link>
+            <Link className={pathname.includes("/comments") ? "active" : ""} to={`/j/${joinCode}/comments`}>
+              Comments
             </Link>
             {hasPreparedQuestions && (
               <Link className={pathname.includes("/practice") ? "active" : ""} to={`/j/${joinCode}/practice`}>

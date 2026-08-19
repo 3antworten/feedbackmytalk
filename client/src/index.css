@@ -362,6 +362,112 @@ select:focus {
 .tabs a:hover {
   text-decoration: none;
 }
+.tabs button {
+  padding: 0.6rem 0.9rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.tabs button.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.board-header h1 {
+  margin: 0;
+}
+
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.view-toggle-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.view-toggle-label.active {
+  color: var(--text);
+}
+.ios-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.ios-switch.on {
+  background: var(--primary);
+}
+.ios-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(20, 24, 34, 0.3);
+  transition: transform 0.15s ease;
+}
+.ios-switch.on .ios-switch-knob {
+  transform: translateX(18px);
+}
+
+.vote-widget {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.vote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.vote-btn:hover {
+  border-color: var(--primary);
+}
+.vote-btn.active-up {
+  border-color: var(--success);
+  background: #e6f6ea;
+  color: var(--success);
+}
+.vote-btn.active-down {
+  border-color: var(--danger);
+  background: #fbe9e9;
+  color: var(--danger);
+}
+.vote-btn.read-only {
+  cursor: default;
+}
+.vote-btn.read-only:hover {
+  border-color: var(--border);
+}
+.vote-count {
+  font-weight: 700;
+}
 
 .slide-image.general-slide-placeholder {
   display: flex;

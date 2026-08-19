@@ -3,15 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useParticipantSession } from "../useParticipantSession";
 import ParticipantLayout from "../components/ParticipantLayout";
+import CommentItem from "../components/CommentItem";
+import QuestionItem from "../components/QuestionItem";
 import { slideLabel } from "../format";
+import { sortByVotes } from "../feedbackSort";
 import logoMark from "../assets/logo-mark.png";
-
-// Own items first (visually separated), then everyone else's, oldest first within each group.
-function splitMineFirst(list, participantId) {
-  const mine = list.filter((i) => i.authorParticipantId === participantId);
-  const others = list.filter((i) => i.authorParticipantId !== participantId);
-  return { mine, others };
-}
 
 export default function SlideViewerPage() {
   const { joinCode, slideIdx } = useParams();
@@ -106,6 +102,42 @@ export default function SlideViewerPage() {
     }
   }
 
+  async function voteComment(id, value) {
+    try {
+      const { votes } = await api.voteComment(id, value, participant.token);
+      setComments((cur) => cur.map((c) => (c.id === id ? { ...c, votes } : c)));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function voteQuestion(id, value) {
+    try {
+      const { votes } = await api.voteQuestion(id, value, participant.token);
+      setQuestions((cur) => cur.map((q) => (q.id === id ? { ...q, votes } : q)));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function toggleAskedLive(id, askedLive) {
+    try {
+      const { question } = await api.updateQuestion(id, { askedLive }, participant.token);
+      setQuestions((cur) => cur.map((q) => (q.id === id ? { ...q, ...question } : q)));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function saveNote(id, answerNote) {
+    try {
+      await api.saveQuestionResponse(id, answerNote, participant.token);
+      setQuestions((cur) => cur.map((q) => (q.id === id ? { ...q, myAnswerNote: answerNote } : q)));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   const combinedError = sessionError || error;
   if (combinedError) {
     return (
@@ -123,12 +155,8 @@ export default function SlideViewerPage() {
   }
 
   const isOpen = session.status === "open";
-  const { mine: myComments, others: otherComments } = comments
-    ? splitMineFirst(comments, participant.id)
-    : { mine: [], others: [] };
-  const { mine: myQuestions, others: otherQuestions } = questions
-    ? splitMineFirst(questions, participant.id)
-    : { mine: [], others: [] };
+  const sortedQuestions = questions ? sortByVotes(questions, participant.id) : [];
+  const sortedComments = comments ? sortByVotes(comments, participant.id) : [];
 
   return (
     <ParticipantLayout joinCode={joinCode} session={session} participant={participant}>
@@ -175,52 +203,6 @@ export default function SlideViewerPage() {
 
       <div className="panel-columns" style={{ marginTop: "1.25rem" }}>
         <div className="stack">
-          <h3 style={{ margin: 0 }}>Comments</h3>
-          {isOpen && (
-            <form className="row" onSubmit={submitComment}>
-              <input
-                type="text"
-                placeholder="Add a comment…"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                maxLength={2000}
-              />
-              <button type="submit" disabled={busy || !commentText.trim()}>
-                Add
-              </button>
-            </form>
-          )}
-          <div className="stack">
-            {comments === null && <p className="muted small">Loading…</p>}
-            {comments?.length === 0 && <p className="muted small">No comments yet on this slide.</p>}
-            {myComments.map((c) => (
-              <div className="item-entry own" key={c.id}>
-                <div className="meta row between">
-                  <span>You · {new Date(c.created_at).toLocaleTimeString()}</span>
-                  {isOpen && (
-                    <button className="ghost small" onClick={() => removeComment(c.id)} title="Delete">
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <div>{c.text}</div>
-              </div>
-            ))}
-            {myComments.length > 0 && otherComments.length > 0 && (
-              <div className="divider-label">From others</div>
-            )}
-            {otherComments.map((c) => (
-              <div className="item-entry" key={c.id}>
-                <div className="meta">
-                  {c.author} · {new Date(c.created_at).toLocaleTimeString()}
-                </div>
-                <div>{c.text}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="stack">
           <h3 style={{ margin: 0 }}>Questions</h3>
           {isOpen && (
             <form className="row" onSubmit={submitQuestion}>
@@ -239,29 +221,53 @@ export default function SlideViewerPage() {
           <div className="stack">
             {questions === null && <p className="muted small">Loading…</p>}
             {questions?.length === 0 && <p className="muted small">No questions yet on this slide.</p>}
-            {myQuestions.map((q) => (
-              <div className="item-entry own" key={q.id}>
-                <div className="meta row between">
-                  <span>You · {new Date(q.created_at).toLocaleTimeString()}</span>
-                  {isOpen && (
-                    <button className="ghost small" onClick={() => removeQuestion(q.id)} title="Delete">
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <div>{q.text}</div>
-              </div>
+            {sortedQuestions.map((q) => (
+              <QuestionItem
+                key={q.id}
+                question={q}
+                showSlideRef={false}
+                isOwn={q.authorParticipantId === participant.id}
+                canModerate={false}
+                canDeleteOwn={isOpen}
+                onVote={voteQuestion}
+                onDelete={removeQuestion}
+                onToggleAskedLive={toggleAskedLive}
+                onSaveNote={saveNote}
+              />
             ))}
-            {myQuestions.length > 0 && otherQuestions.length > 0 && (
-              <div className="divider-label">From others</div>
-            )}
-            {otherQuestions.map((q) => (
-              <div className="item-entry" key={q.id}>
-                <div className="meta">
-                  {q.author} · {new Date(q.created_at).toLocaleTimeString()}
-                </div>
-                <div>{q.text}</div>
-              </div>
+          </div>
+        </div>
+
+        <div className="stack">
+          <h3 style={{ margin: 0 }}>Comments</h3>
+          {isOpen && (
+            <form className="row" onSubmit={submitComment}>
+              <input
+                type="text"
+                placeholder="Add a comment…"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                maxLength={2000}
+              />
+              <button type="submit" disabled={busy || !commentText.trim()}>
+                Add
+              </button>
+            </form>
+          )}
+          <div className="stack">
+            {comments === null && <p className="muted small">Loading…</p>}
+            {comments?.length === 0 && <p className="muted small">No comments yet on this slide.</p>}
+            {sortedComments.map((c) => (
+              <CommentItem
+                key={c.id}
+                comment={c}
+                showSlideRef={false}
+                isOwn={c.authorParticipantId === participant.id}
+                canModerate={false}
+                canDeleteOwn={isOpen}
+                onVote={voteComment}
+                onDelete={removeComment}
+              />
             ))}
           </div>
         </div>

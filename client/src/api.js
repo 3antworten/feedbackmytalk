@@ -69,11 +69,19 @@ export const api = {
   getSession: (sessionId) => request(`/sessions/${sessionId}`),
   updateSession: (sessionId, patch) => request(`/sessions/${sessionId}`, { method: "PATCH", body: patch }),
   deleteSession: (sessionId) => request(`/sessions/${sessionId}`, { method: "DELETE" }),
-  reviewBySlide: (sessionId) => request(`/sessions/${sessionId}/review/slides`),
-  reviewQuestions: (sessionId) => request(`/sessions/${sessionId}/review/questions`),
   reviewPractice: (sessionId) => request(`/sessions/${sessionId}/review/practice`),
   deleteCommentAsSpeaker: (id) => request(`/comments/${id}`, { method: "DELETE" }),
   deleteQuestionAsSpeaker: (id) => request(`/questions/${id}`, { method: "DELETE" }),
+
+  // Feedback (comments/questions), flat + session-wide — shared by the speaker's review
+  // pages and the participant's Comments/Questions tabs. `token` is omitted for the speaker
+  // (cookie auth) and passed for participants.
+  sessionComments: (sessionId, token) => request(`/sessions/${sessionId}/comments`, { participantToken: token }),
+  sessionQuestions: (sessionId, token) => request(`/sessions/${sessionId}/questions`, { participantToken: token }),
+  voteComment: (id, value, token) =>
+    request(`/comments/${id}/vote`, { method: "PUT", body: { value }, participantToken: token }),
+  voteQuestion: (id, value, token) =>
+    request(`/questions/${id}/vote`, { method: "PUT", body: { value }, participantToken: token }),
 
   // Prepared (practice) questions — speaker manages, participant responds.
   listPreparedQuestions: (sessionId, token) =>
@@ -92,7 +100,6 @@ export const api = {
   lookupJoinCode: (joinCode) => request(`/join/${joinCode}`),
   join: (joinCode, displayName) => request(`/join/${joinCode}`, { method: "POST", body: { displayName } }),
   participantSlides: (sessionId, token) => request(`/sessions/${sessionId}/slides`, { participantToken: token }),
-  myItems: (sessionId, token) => request(`/sessions/${sessionId}/my-items`, { participantToken: token }),
 
   listComments: (sessionId, slideId, token) =>
     request(`/sessions/${sessionId}/slides/${slideId}/comments`, { participantToken: token }),
@@ -115,4 +122,6 @@ export const api = {
   deleteQuestion: (id, token) => request(`/questions/${id}`, { method: "DELETE", participantToken: token }),
   updateQuestion: (id, patch, token) =>
     request(`/questions/${id}`, { method: "PATCH", body: patch, participantToken: token }),
+  saveQuestionResponse: (id, answerNote, token) =>
+    request(`/questions/${id}/response`, { method: "PATCH", body: { answerNote }, participantToken: token }),
 };
