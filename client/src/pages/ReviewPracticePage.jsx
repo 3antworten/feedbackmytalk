@@ -44,7 +44,9 @@ export default function ReviewPracticePage() {
       <div className="stack">
         {data?.questions.map((q) => (
           <div className="card stack" key={q.id}>
-            <strong>{q.text}</strong>
+            <div className="feedback-content">
+              <strong>{q.text}</strong>
+            </div>
             {q.responses.length === 0 && (
               <p className="muted small" style={{ margin: 0 }}>
                 No participant has responded to this one yet.
@@ -54,16 +56,13 @@ export default function ReviewPracticePage() {
               <div className="stack">
                 {q.responses.map((r, i) => (
                   <div className="item-entry" key={i}>
-                    <div className="meta row between">
-                      <span>
-                        {r.author} · {new Date(r.updatedAt).toLocaleString()}
+                    <div className="meta">
+                      <span className={`badge ${r.askedLive ? "open" : "closed"}`} style={{ marginRight: "0.5rem" }}>
+                        {r.askedLive ? "ASKED" : "NOT ASKED"}
                       </span>
-                      <span className={`badge ${r.askedLive ? "open" : "closed"}`}>
-                        {r.askedLive ? "Asked live" : "Not asked live"}
-                      </span>
+                      {r.author} · {new Date(r.updatedAt).toLocaleString()}
                     </div>
-                    {r.answerNote && <div>{r.answerNote}</div>}
-                    {!r.answerNote && <div className="muted small">No note left.</div>}
+                    {r.answerNote && <div className="feedback-note">{r.answerNote}</div>}
                   </div>
                 ))}
               </div>

@@ -186,8 +186,8 @@ export default function SlideViewerPage() {
           <img src={logoMark} alt="" className="wrap-up-mark" />
           <h2 style={{ margin: 0 }}>That&apos;s a wrap</h2>
           <p className="muted small" style={{ maxWidth: 420 }}>
-            Not tied to a specific slide — use this space for overall impressions, wrap-up
-            thoughts, or anything else that came up.
+            Use this space for overall impressions,<br />
+            wrap-up thoughts, or anything else that came up.
           </p>
         </div>
       ) : (

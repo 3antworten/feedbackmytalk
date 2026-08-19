@@ -15,10 +15,11 @@ function slideOf(item) {
 }
 
 // Renders one question row using the same header/content/footer template as comments.
-// The footer additionally carries the "asked live" control (checkbox for participants,
-// read-only badge for the speaker), left of the vote widget. Once asked live, a reply-like
-// note section appears below the footer — every participant gets their own editable note;
-// the speaker only ever sees a read-only list, and only when someone actually left one.
+// Participants get the "asked live" checkbox in the footer, next to the vote widget. The
+// speaker instead sees a compact ASKED/NOT ASKED badge as the first element of the header
+// (it's the fact they scan for first) and only votes in the footer. Once asked live, a
+// reply-like note section appears below the footer — every participant gets their own
+// editable note; the speaker only ever sees a read-only list, and only if one exists.
 export default function QuestionItem({
   question,
   showSlideRef,
@@ -52,6 +53,11 @@ export default function QuestionItem({
     <div className={`item-entry${isOwn ? " own" : ""}`}>
       <div className="meta row between">
         <span>
+          {canModerate && (
+            <span className={`badge ${question.askedLive ? "open" : "closed"}`} style={{ marginRight: "0.5rem" }}>
+              {question.askedLive ? "ASKED" : "NOT ASKED"}
+            </span>
+          )}
           {isOwn ? "You" : question.author}
           {showSlideRef && (
             <>
@@ -76,11 +82,7 @@ export default function QuestionItem({
           interactive={!canModerate}
           hideEmpty={canModerate}
         />
-        {canModerate ? (
-          <span className={`badge ${question.askedLive ? "open" : "closed"}`}>
-            {question.askedLive ? "Asked live" : "Not asked live"}
-          </span>
-        ) : (
+        {!canModerate && (
           <label className="checkbox-row small">
             <input
               type="checkbox"

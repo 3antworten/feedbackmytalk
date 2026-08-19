@@ -27,7 +27,8 @@ function extractHeuristicTitle(page) {
   }
 }
 
-// Renders every page of a PDF (given as a Buffer) into PNG files under outDir.
+// Renders every page of a PDF (given as a Buffer) into JPEG files under outDir (JPEG at
+// 80% quality keeps slides legible while using much less disk/bandwidth than PNG).
 // Returns an array of { orderIndex, fileName, title } in page order.
 export function renderPdfToImages(pdfBuffer, outDir) {
   fs.mkdirSync(outDir, { recursive: true });
@@ -35,14 +36,15 @@ export function renderPdfToImages(pdfBuffer, outDir) {
   const pageCount = doc.countPages();
   const zoom = 144 / 72; // ~144 DPI, decent legibility without huge files
   const matrix = mupdf.Matrix.scale(zoom, zoom);
+  const JPEG_QUALITY = 80;
 
   const slides = [];
   for (let i = 0; i < pageCount; i++) {
     const page = doc.loadPage(i);
     const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
-    const png = pixmap.asPNG();
-    const fileName = `slide-${String(i + 1).padStart(3, "0")}.png`;
-    fs.writeFileSync(path.join(outDir, fileName), Buffer.from(png));
+    const jpeg = pixmap.asJPEG(JPEG_QUALITY, false);
+    const fileName = `slide-${String(i + 1).padStart(3, "0")}.jpg`;
+    fs.writeFileSync(path.join(outDir, fileName), Buffer.from(jpeg));
     slides.push({ orderIndex: i, fileName, title: extractHeuristicTitle(page) });
   }
   return slides;
