@@ -12,6 +12,7 @@ export default function CommentsBoard({
   view,
   canModerate,
   canDeleteOwn = true,
+  sessionOpen = true,
   viewerParticipantId,
   onVote,
   onDelete,
@@ -33,6 +34,7 @@ export default function CommentsBoard({
             isOwn={!canModerate && c.authorParticipantId === viewerParticipantId}
             canModerate={canModerate}
             canDeleteOwn={canDeleteOwn}
+            sessionOpen={sessionOpen}
             onVote={onVote}
             onDelete={onDelete}
           />
@@ -63,6 +65,7 @@ export default function CommentsBoard({
                     isOwn={!canModerate && c.authorParticipantId === viewerParticipantId}
                     canModerate={canModerate}
                     canDeleteOwn={canDeleteOwn}
+                    sessionOpen={sessionOpen}
                     onVote={onVote}
                     onDelete={onDelete}
                   />

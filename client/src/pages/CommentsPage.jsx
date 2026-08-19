@@ -73,12 +73,19 @@ export default function CommentsPage() {
         <ViewToggle view={view} onChange={setView} />
       </div>
       <p className="muted small">Every comment left in this session — yours are highlighted.</p>
+      {session.status !== "open" && (
+        <p className="muted small">
+          This session is closed — you can browse existing comments, but voting and new comments
+          are no longer possible.
+        </p>
+      )}
       <CommentsBoard
         comments={comments}
         slides={slides}
         view={view}
         canModerate={false}
         canDeleteOwn={session.status === "open"}
+        sessionOpen={session.status === "open"}
         viewerParticipantId={participant.id}
         onVote={voteComment}
         onDelete={removeComment}

@@ -20,6 +20,7 @@ export default function CommentItem({
   isOwn,
   canModerate,
   canDeleteOwn = true,
+  sessionOpen = true,
   onVote,
   onDelete,
 }) {
@@ -48,7 +49,7 @@ export default function CommentItem({
         <VoteWidget
           votes={comment.votes}
           onVote={(value) => onVote(comment.id, value)}
-          interactive={!canModerate}
+          interactive={!canModerate && sessionOpen}
           hideEmpty={canModerate}
         />
       </div>

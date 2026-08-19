@@ -13,6 +13,7 @@ export default function QuestionsBoard({
   view,
   canModerate,
   canDeleteOwn = true,
+  sessionOpen = true,
   viewerParticipantId,
   onVote,
   onDelete,
@@ -40,6 +41,7 @@ export default function QuestionsBoard({
             isOwn={isOwn(q)}
             canModerate={canModerate}
             canDeleteOwn={canDeleteOwn}
+            sessionOpen={sessionOpen}
             onVote={onVote}
             onDelete={onDelete}
             onToggleAskedLive={onToggleAskedLive}
@@ -72,6 +74,7 @@ export default function QuestionsBoard({
                     isOwn={isOwn(q)}
                     canModerate={canModerate}
                     canDeleteOwn={canDeleteOwn}
+                    sessionOpen={sessionOpen}
                     onVote={onVote}
                     onDelete={onDelete}
                     onToggleAskedLive={onToggleAskedLive}

@@ -26,6 +26,7 @@ export default function QuestionItem({
   isOwn,
   canModerate,
   canDeleteOwn = true,
+  sessionOpen = true,
   onVote,
   onDelete,
   onToggleAskedLive,
@@ -79,7 +80,7 @@ export default function QuestionItem({
         <VoteWidget
           votes={question.votes}
           onVote={(value) => onVote(question.id, value)}
-          interactive={!canModerate}
+          interactive={!canModerate && sessionOpen}
           hideEmpty={canModerate}
         />
         {!canModerate && (
@@ -87,6 +88,7 @@ export default function QuestionItem({
             <input
               type="checkbox"
               checked={question.askedLive}
+              disabled={!sessionOpen}
               onChange={(e) => onToggleAskedLive(question.id, e.target.checked)}
             />
             Asked live
@@ -111,6 +113,7 @@ export default function QuestionItem({
             rows={2}
             value={answerNote}
             onChange={handleNoteChange}
+            disabled={!sessionOpen}
             placeholder="Feedback the answer: well explained or expected more?"
           />
         </label>

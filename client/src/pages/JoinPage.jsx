@@ -55,6 +55,27 @@ export default function JoinPage() {
     );
   }
 
+  if (info.session.status !== "open") {
+    return (
+      <div className="container narrow">
+        <PageLogo />
+        <div className="card stack">
+          <div>
+            <strong>{info.session.name || info.deck.name}</strong>
+            {info.session.name && <div className="muted small">{info.deck.name}</div>}
+          </div>
+          <p>
+            This presentation exists, but the session has been closed. Joining is no longer
+            possible.
+          </p>
+          <p className="muted small">
+            If you&apos;d like to leave feedback, ask the speaker to reopen the session.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container narrow">
       <PageLogo />

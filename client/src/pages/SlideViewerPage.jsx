@@ -229,6 +229,7 @@ export default function SlideViewerPage() {
                 isOwn={q.authorParticipantId === participant.id}
                 canModerate={false}
                 canDeleteOwn={isOpen}
+                sessionOpen={isOpen}
                 onVote={voteQuestion}
                 onDelete={removeQuestion}
                 onToggleAskedLive={toggleAskedLive}
@@ -265,6 +266,7 @@ export default function SlideViewerPage() {
                 isOwn={c.authorParticipantId === participant.id}
                 canModerate={false}
                 canDeleteOwn={isOpen}
+                sessionOpen={isOpen}
                 onVote={voteComment}
                 onDelete={removeComment}
               />

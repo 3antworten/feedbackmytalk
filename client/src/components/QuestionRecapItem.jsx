@@ -6,7 +6,7 @@ const AUTOSAVE_DELAY_MS = 900;
 // the round-trip to persist the change. The note auto-saves shortly after the author stops
 // typing. The note is only shown once the question has been marked as asked live. Follows
 // the same header/content/footer template as the slide questions (QuestionItem).
-export default function QuestionRecapItem({ question, onUpdate, header }) {
+export default function QuestionRecapItem({ question, onUpdate, header, disabled = false }) {
   const [askedLive, setAskedLive] = useState(question.askedLive);
   const [answerNote, setAnswerNote] = useState(question.answerNote || "");
   const debounceRef = useRef(null);
@@ -45,7 +45,7 @@ export default function QuestionRecapItem({ question, onUpdate, header }) {
       <div className="feedback-content">{question.text}</div>
       <div className="feedback-footer row">
         <label className="checkbox-row small">
-          <input type="checkbox" checked={askedLive} onChange={handleAskedLiveChange} />
+          <input type="checkbox" checked={askedLive} disabled={disabled} onChange={handleAskedLiveChange} />
           Asked live
         </label>
       </div>
@@ -55,6 +55,7 @@ export default function QuestionRecapItem({ question, onUpdate, header }) {
             rows={2}
             value={answerNote}
             onChange={handleNoteChange}
+            disabled={disabled}
             placeholder="Feedback the answer: well explained or expected more?"
           />
         </label>

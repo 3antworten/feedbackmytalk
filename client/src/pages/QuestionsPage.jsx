@@ -94,12 +94,19 @@ export default function QuestionsPage() {
         Every question asked in this session — yours are highlighted. Anyone can mark a question
         as asked live, and once that happens everyone can leave their own note on how it landed.
       </p>
+      {session.status !== "open" && (
+        <p className="muted small">
+          This session is closed — you can browse existing questions, but voting, marking asked
+          live, and leaving notes are no longer possible.
+        </p>
+      )}
       <QuestionsBoard
         questions={questions}
         slides={slides}
         view={view}
         canModerate={false}
         canDeleteOwn={session.status === "open"}
+        sessionOpen={session.status === "open"}
         viewerParticipantId={participant.id}
         onVote={voteQuestion}
         onDelete={removeQuestion}

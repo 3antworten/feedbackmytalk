@@ -102,6 +102,10 @@ preparedQuestionResponseRouter.patch("/", (req, res) => {
   }
   const pq = db.prepare("SELECT * FROM prepared_questions WHERE id = ? AND session_id = ?").get(id, sessionId);
   if (!pq) return res.status(404).json({ error: "Question not found" });
+  const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId);
+  if (session.status !== "open") {
+    return res.status(403).json({ error: "Session is closed; responses can no longer be edited" });
+  }
 
   const existing = db
     .prepare("SELECT * FROM prepared_question_responses WHERE prepared_question_id = ? AND participant_id = ?")

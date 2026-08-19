@@ -99,7 +99,8 @@ commentByIdRouter.delete("/:id", (req, res) => {
   res.status(403).json({ error: "Not authorized to delete this comment" });
 });
 
-// Vote: any participant of the session, or the owning speaker, may cast/change/remove a vote.
+// Vote: any participant of the session, or the owning speaker, may cast/change/remove a vote,
+// while the session is still open — voting is a live feedback interaction, not moderation.
 commentByIdRouter.put("/:id/vote", (req, res) => {
   const comment = db.prepare("SELECT * FROM comments WHERE id = ?").get(req.params.id);
   if (!comment) return res.status(404).json({ error: "Comment not found" });
@@ -111,6 +112,9 @@ commentByIdRouter.put("/:id/vote", (req, res) => {
     db.prepare("SELECT 1 FROM decks WHERE id = ? AND speaker_id = ?").get(session.deck_id, req.speaker.id);
   if (!isParticipantOfSession && !isOwningSpeaker) {
     return res.status(403).json({ error: "Not authorized to vote on this comment" });
+  }
+  if (session.status !== "open") {
+    return res.status(403).json({ error: "Session is closed; voting is no longer possible" });
   }
 
   try {

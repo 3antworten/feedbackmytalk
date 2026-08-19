@@ -29,6 +29,12 @@ router.post("/:joinCode", (req, res) => {
     .prepare("SELECT * FROM sessions WHERE join_code = ?")
     .get(req.params.joinCode.toUpperCase());
   if (!session) return res.status(404).json({ error: "No session found for this link" });
+  if (session.status !== "open") {
+    return res.status(403).json({
+      error: "This session is closed. Ask the speaker to reopen it if you'd like to leave feedback.",
+      sessionClosed: true,
+    });
+  }
 
   const displayName = (req.body?.displayName || "").trim().slice(0, 80) || null;
   const joinOrder = 1 + db.prepare("SELECT COUNT(*) AS n FROM participants WHERE session_id = ?").get(session.id).n;

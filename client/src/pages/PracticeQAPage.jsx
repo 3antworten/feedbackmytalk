@@ -53,6 +53,12 @@ export default function PracticeQAPage() {
         which ones you might ask, and note privately how well they land — only you see your
         notes here.
       </p>
+      {session.status !== "open" && (
+        <p className="muted small">
+          This session is closed — you can review your past answers, but marking a question as
+          asked live or editing your note is no longer possible.
+        </p>
+      )}
 
       {questions.length === 0 && (
         <div className="card">
@@ -62,7 +68,12 @@ export default function PracticeQAPage() {
 
       <div className="stack">
         {questions.map((q) => (
-          <QuestionRecapItem key={q.id} question={q} onUpdate={(patch) => respond(q.id, patch)} />
+          <QuestionRecapItem
+            key={q.id}
+            question={q}
+            onUpdate={(patch) => respond(q.id, patch)}
+            disabled={session.status !== "open"}
+          />
         ))}
       </div>
     </ParticipantLayout>

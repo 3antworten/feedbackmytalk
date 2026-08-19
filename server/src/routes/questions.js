@@ -123,13 +123,15 @@ questionByIdRouter.delete("/:id", (req, res) => {
 });
 
 // Update askedLive — any participant of the session may toggle it (it's a shared fact about
-// whether the question got asked live, not any one person's opinion). Editable regardless
-// of session open/closed status.
+// whether the question got asked live, not any one person's opinion) while the session is open.
 questionByIdRouter.patch("/:id", (req, res) => {
   const { question, session } = loadWithSession(req.params.id);
   if (!question) return res.status(404).json({ error: "Question not found" });
   if (!req.participant || req.participant.session_id !== session.id) {
     return res.status(403).json({ error: "Only session participants can update this question" });
+  }
+  if (session.status !== "open") {
+    return res.status(403).json({ error: "Session is closed; questions can no longer be updated" });
   }
 
   const askedLive = req.body?.askedLive;
@@ -162,13 +164,17 @@ questionByIdRouter.patch("/:id/response", (req, res) => {
   if (!req.participant || req.participant.session_id !== session.id) {
     return res.status(403).json({ error: "Only session participants can leave a note" });
   }
+  if (session.status !== "open") {
+    return res.status(403).json({ error: "Session is closed; notes can no longer be edited" });
+  }
 
   const answerNote = typeof req.body?.answerNote === "string" ? req.body.answerNote.slice(0, 2000) : "";
   upsertQuestionResponse(question.id, req.participant.id, answerNote);
   res.json({ answerNote });
 });
 
-// Vote: any participant of the session, or the owning speaker, may cast/change/remove a vote.
+// Vote: any participant of the session, or the owning speaker, may cast/change/remove a vote,
+// while the session is still open.
 questionByIdRouter.put("/:id/vote", (req, res) => {
   const { question, session } = loadWithSession(req.params.id);
   if (!question) return res.status(404).json({ error: "Question not found" });
@@ -179,6 +185,9 @@ questionByIdRouter.put("/:id/vote", (req, res) => {
     db.prepare("SELECT 1 FROM decks WHERE id = ? AND speaker_id = ?").get(session.deck_id, req.speaker.id);
   if (!isParticipantOfSession && !isOwningSpeaker) {
     return res.status(403).json({ error: "Not authorized to vote on this question" });
+  }
+  if (session.status !== "open") {
+    return res.status(403).json({ error: "Session is closed; voting is no longer possible" });
   }
 
   try {
