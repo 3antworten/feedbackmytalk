@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../AuthContext";
 import Layout from "../components/Layout";
 
 export default function AdminPage() {
-  const { speaker } = useAuth();
+  const { speaker, refresh } = useAuth();
+  const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
   const [speakers, setSpeakers] = useState(null);
   const [decks, setDecks] = useState(null);
@@ -56,6 +58,17 @@ export default function AdminPage() {
     try {
       await api.adminDeleteDeck(d.id);
       reload();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function viewAs(s) {
+    setError(null);
+    try {
+      await api.adminImpersonate(s.id);
+      await refresh();
+      navigate("/dashboard");
     } catch (e) {
       setError(e.message);
     }
@@ -121,9 +134,14 @@ export default function AdminPage() {
                   </div>
                 </div>
                 {s.id !== speaker.id && (
-                  <button className="danger small" onClick={() => deleteSpeaker(s)}>
-                    Delete
-                  </button>
+                  <div className="row">
+                    <button className="secondary small" onClick={() => viewAs(s)}>
+                      View as
+                    </button>
+                    <button className="danger small" onClick={() => deleteSpeaker(s)}>
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
             ))}

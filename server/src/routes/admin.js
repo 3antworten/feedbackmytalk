@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "../db/index.js";
-import { requireAdmin } from "../auth.js";
+import { requireAdmin, issueSpeakerCookie } from "../auth.js";
 import { getSignupsEnabled, setSignupsEnabled } from "../settings.js";
 import { removeDeckFiles } from "../uploads.js";
 import { MAIL_ENABLED } from "../config.js";
+import { formatSpeaker } from "../format.js";
 
 const router = Router();
 
@@ -54,6 +55,19 @@ router.delete("/speakers/:id", (req, res) => {
   for (const deckId of deckIds) removeDeckFiles(deckId);
 
   res.status(204).end();
+});
+
+// Lets an admin browse the app as a given speaker would see it (read/write acts as that
+// speaker), without needing their password. Short-lived cookie; "imp" records who to
+// return to via POST /api/auth/stop-impersonating.
+router.post("/impersonate/:id", (req, res) => {
+  if (req.params.id === req.speaker.id) {
+    return res.status(400).json({ error: "That's already you" });
+  }
+  const target = db.prepare("SELECT * FROM speakers WHERE id = ?").get(req.params.id);
+  if (!target) return res.status(404).json({ error: "Speaker not found" });
+  issueSpeakerCookie(res, target.id, req.speaker.id);
+  res.json({ speaker: formatSpeaker(target) });
 });
 
 router.get("/decks", (_req, res) => {

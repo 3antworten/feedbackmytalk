@@ -44,6 +44,7 @@ export const api = {
   me: () => request("/auth/me"),
   confirmEmail: (token) => request(`/auth/confirm-email/${token}`, { method: "POST" }),
   resendConfirmation: (email) => request("/auth/resend-confirmation", { method: "POST", body: { email } }),
+  stopImpersonating: () => request("/auth/stop-impersonating", { method: "POST" }),
 
   // Admin
   adminGetSettings: () => request("/admin/settings"),
@@ -52,6 +53,7 @@ export const api = {
   adminDeleteSpeaker: (id) => request(`/admin/speakers/${id}`, { method: "DELETE" }),
   adminListDecks: () => request("/admin/decks"),
   adminDeleteDeck: (id) => request(`/admin/decks/${id}`, { method: "DELETE" }),
+  adminImpersonate: (id) => request(`/admin/impersonate/${id}`, { method: "POST" }),
 
   // Decks
   listDecks: () => request("/decks"),

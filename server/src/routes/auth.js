@@ -106,6 +106,16 @@ router.get("/me", requireSpeaker, (req, res) => {
   res.json({ speaker: req.speaker });
 });
 
+// Hands control back to the admin who started an impersonation session (see
+// POST /api/admin/impersonate/:id).
+router.post("/stop-impersonating", requireSpeaker, (req, res) => {
+  if (!req.speaker.impersonatedBy) return res.status(400).json({ error: "Not impersonating" });
+  const admin = db.prepare("SELECT * FROM speakers WHERE id = ?").get(req.speaker.impersonatedBy);
+  if (!admin) return res.status(404).json({ error: "Admin account not found" });
+  issueSpeakerCookie(res, admin.id);
+  res.json({ speaker: formatSpeaker(admin) });
+});
+
 // Consumes a confirmation link's token, activates the account, and logs the speaker in.
 router.post("/confirm-email/:token", (req, res) => {
   const row = db.prepare("SELECT * FROM speakers WHERE confirmation_token = ?").get(req.params.token);

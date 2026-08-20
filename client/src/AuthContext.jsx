@@ -56,8 +56,13 @@ export function AuthProvider({ children }) {
     setSpeaker(null);
   }, []);
 
+  const stopImpersonating = useCallback(async () => {
+    const data = await api.stopImpersonating();
+    setSpeaker(data.speaker);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ speaker, error, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ speaker, error, login, register, logout, refresh, stopImpersonating }}>
       {children}
     </AuthContext.Provider>
   );

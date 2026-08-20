@@ -6,13 +6,18 @@ import { formatSpeaker } from "./format.js";
 const COOKIE_NAME = "fmt_token";
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
 
-export function issueSpeakerCookie(res, speakerId) {
-  const token = jwt.sign({ sub: speakerId }, JWT_SECRET, { expiresIn: "30d" });
+// `impersonatedBy` (admin speaker id), when set, marks this cookie as an admin "view as"
+// session — kept short-lived and recorded in the token so /auth/stop-impersonating can
+// hand control back to the admin account without requiring them to log in again.
+export function issueSpeakerCookie(res, speakerId, impersonatedBy) {
+  const payload = impersonatedBy ? { sub: speakerId, imp: impersonatedBy } : { sub: speakerId };
+  const maxAge = impersonatedBy ? 2 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: impersonatedBy ? "2h" : "30d" });
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: COOKIE_SECURE,
-    maxAge: 30 * 24 * 60 * 60 * 1000,
+    maxAge,
   });
 }
 
@@ -27,7 +32,10 @@ export function attachSpeaker(req, _res, next) {
     try {
       const payload = jwt.verify(token, JWT_SECRET);
       const speaker = db.prepare("SELECT * FROM speakers WHERE id = ?").get(payload.sub);
-      if (speaker) req.speaker = formatSpeaker(speaker);
+      if (speaker) {
+        req.speaker = formatSpeaker(speaker);
+        if (payload.imp) req.speaker.impersonatedBy = payload.imp;
+      }
     } catch {
       // ignore invalid/expired token
     }
